@@ -18,32 +18,34 @@ import io.flutter.plugins.GeneratedPluginRegistrant
 import kotlin.math.max
 
 class MainActivity : FlutterActivity() {
-    private val samplingRate = 44100
+    companion object{
+        private const val samplingRate = 44100
 
-    // フレームレート (fps)
-    // 1秒間に何回音声データを処理したいか
-    // 各自好きに決める
-    private val frameRate = 10
+        // フレームレート (fps)
+        // 1秒間に何回音声データを処理したいか
+        // 各自好きに決める
+        private const val frameRate = 10
 
-    // 1フレームの音声データ(=Short値)の数
-    private val oneFrameDataCount = samplingRate / frameRate
+        // 1フレームの音声データ(=Short値)の数
+        private const val oneFrameDataCount = samplingRate / frameRate
 
-    // 1フレームの音声データのバイト数 (byte)
-    // Byte = 8 bit, Short = 16 bit なので, Shortの倍になる
-    private val oneFrameSizeInByte = oneFrameDataCount * 2
+        // 1フレームの音声データのバイト数 (byte)
+        // Byte = 8 bit, Short = 16 bit なので, Shortの倍になる
+        private const val oneFrameSizeInByte = oneFrameDataCount * 2
 
-    // 音声データのバッファサイズ (byte)
-    // 要件1:oneFrameSizeInByte より大きくする必要がある
-    // 要件2:デバイスの要求する最小値より大きくする必要がある
-    private val audioBufferSizeInByte =
-        max(
-            oneFrameSizeInByte * 10, // 適当に10フレーム分のバッファを持たせた
-            AudioRecord.getMinBufferSize(
-                samplingRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_8BIT
+        // 音声データのバッファサイズ (byte)
+        // 要件1:oneFrameSizeInByte より大きくする必要がある
+        // 要件2:デバイスの要求する最小値より大きくする必要がある
+        private val audioBufferSizeInByte =
+            max(
+                oneFrameSizeInByte * 10, // 適当に10フレーム分のバッファを持たせた
+                AudioRecord.getMinBufferSize(
+                    samplingRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_8BIT
+                )
             )
-        )
+    }
     private lateinit var morokoshiAudioTrack: MorokoshiAudioTrack
 
     inner class MorokoshiAudioTrack {
@@ -264,8 +266,8 @@ class MainActivity : FlutterActivity() {
                         try {
                             morokoshiAudioTrack.play(byte)
                             result.success(null)
-                        } catch (e:Error) {
-                            result.error("",e.message,null)
+                        } catch (e: Error) {
+                            result.error("", e.message, null)
                         }
                     }
                 }
