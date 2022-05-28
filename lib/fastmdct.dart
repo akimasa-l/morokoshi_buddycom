@@ -1,4 +1,5 @@
 import "dart:math";
+import 'dart:typed_data';
 
 /// コピペ：
 /// https://qiita.com/as_kuya/items/8acaa265bc740d925f4c
@@ -20,7 +21,7 @@ import "dart:math";
 /// j - サンプリング配列の添字 (時間)
 /// k - 周波数配列への添字 (周波数)
 class Vector {
-  final List<double> data;
+  final Float32List data;
   const Vector.fromList(this.data);
   // 要素を入れ替える
   void swap(int a, int b) {
@@ -142,7 +143,8 @@ class FastMDCT {
   // samples - 2n個のサンプル配列、この配列が変換処理の入力元となる
   // frequencies - n個の周波数配列、この配列が変換処理の出力先となる
   static Vector mdct(int n, Vector samples) {
-    Vector frequencies = Vector.fromList(List.filled(n, 0.0));
+    Vector frequencies =
+        Vector.fromList(Float32List.fromList(List.filled(n, 0.0)));
     // データを結合
     final ns1 = n - 1; // n - 1
     final nd2 = n >> 1; // n / 2
@@ -181,7 +183,8 @@ class FastMDCT {
   static Vector imdct(int n, Vector frequencies) {
     // TODO 入力元である周波数配列を破壊してしまうので作業用バッファを用いるか、破壊して良い出力先のsamplesを作業用バッファとして用いる
     // cos値の変換用係数を掛け合わせ
-    Vector samples = Vector.fromList(List.filled(n << 1, 0.0));
+    Vector samples =
+        Vector.fromList(Float32List.fromList(List.filled(n << 1, 0.0)));
     final rad = pi / (n << 2);
     for (var i = 0; i < n; ++i) {
       frequencies[i] *= 2.0 * cos(rad * ((i << 1) + 1));

@@ -5,6 +5,7 @@ import "dart:async";
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/io.dart';
+import 'package:web_socket_channel/status.dart' as status;
 import "dart:async";
 import "fastmdct.dart";
 
@@ -70,20 +71,36 @@ class _BuddycomButtonState extends State<BuddycomButton> {
       EventChannel("com.morokoshi.audio.recorder");
   static const MethodChannel _playChannel =
       MethodChannel("com.morokoshi.audio.player");
+  static final url = Uri(scheme: "ws", host: "54.151.30.235", port: 8080);
   late StreamSubscription _streamSubscription;
   Float32List buffer = Float32List.fromList([.1, .2, .3, .4]);
   Float32List compressed = Float32List.fromList([.0, .0, .0]);
   Float32List expanded = Float32List.fromList([.0, .0, .0]);
   List<Float32List> playList = [];
+  late final IOWebSocketChannel channel;
+  bool isRecording = false;
   var ans = 0.0;
   @override
   void initState() {
     super.initState();
+    channel = IOWebSocketChannel.connect(url);
+    channel.stream.listen((event) {
+      if (!isRecording) {
+        final data = (event as Uint8List).buffer.asFloat32List();
+        setState(() {
+          buffer = data;
+        });
+        () async {
+          await _playChannel.invokeMethod("play", {"byte": data});
+        }();
+      }
+    });
   }
 
   @override
   void dispose() {
     super.dispose();
+    channel.sink.close(status.goingAway);
   }
 
   @override
@@ -102,14 +119,19 @@ class _BuddycomButtonState extends State<BuddycomButton> {
                 // debugPrint(event.runtimeType.toString());
                 setState(() {
                   buffer = event as Float32List;
-                  // playList.add(buffer);
+                  playList.add(buffer);
                   // debugPrint("buffer length : ${buffer.length}");
-                  compressed = Float32List.fromList(FastMDCT.mdct(
-                      buffer.length>>1, Vector.fromList([...buffer] /* コピーする */)).data);
-                  expanded = Float32List.fromList(
-                      FastMDCT.imdct(compressed.length, Vector.fromList([...compressed]))
-                          .data);
-                  playList.add(expanded);
+                  compressed = FastMDCT.mdct(
+                      buffer.length >> 1,
+                      Vector.fromList(
+                          Float32List.fromList([...buffer]) /* コピーする */)).data;
+                  expanded = FastMDCT.imdct(
+                      compressed.length,
+                      Vector.fromList(
+                          Float32List.fromList([...compressed]))).data;
+                  // playList.add(expanded);
+                  channel.sink.add(buffer.buffer.asUint8List());
+                  isRecording = true;
                 });
                 // debugPrint("event: $event");
               },
@@ -118,6 +140,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
           onLongPressEnd: (details) {
             debugPrint("long press end");
             _streamSubscription.cancel();
+            isRecording = false;
           },
         ),
         ElevatedButton(
@@ -186,68 +209,6 @@ class _BuddycomButtonState extends State<BuddycomButton> {
   }
 }
 
-/* class WavePainter2Test extends StatefulWidget {
-  const WavePainter2Test({Key? key}) : super(key: key);
-  @override
-  State<WavePainter2Test> createState() => _WavePainter2TestState();
-}
-
-class _WavePainter2TestState extends State<WavePainter2Test> {
-  var buffer = [0.0, 0.0, 0.0, 0.0];
-  @override
-  void initState() {
-    super.initState();
-    Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      buffer = List.generate(100, (index) => Random().nextDouble());
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(200, 200),
-      painter: WavePainter2(
-        samples: buffer,
-        color: Colors.blue,
-        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
-      ),
-    );
-  }
-}
- */
-/* class WavePainter1Test extends StatefulWidget {
-  const WavePainter1Test({Key? key}) : super(key: key);
-  @override
-  State<WavePainter1Test> createState() => _WavePainter1TestState();
-}
-
-class _WavePainter1TestState extends State<WavePainter1Test> {
-  var buffer = Uint8List.fromList([1, 2, 3, 4]);
-  @override
-  void initState() {
-    super.initState();
-    Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      setState(() {
-        buffer = Uint8List.fromList(
-          List.generate(100, (index) => Random().nextInt(256)),
-        );
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(200, 200),
-      painter: WavePainter(
-        samples: buffer,
-        // color: Colors.blue,
-        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
-      ),
-    );
-  }
-} */
-
 class WavePainter2 extends CustomPainter {
   WavePainter2({
     required this.samples,
@@ -310,7 +271,7 @@ class MorokoshiButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      "aaa",
+      "デカ",
       style: Theme.of(context).textTheme.displayLarge,
     );
   }
@@ -322,22 +283,6 @@ class Buddycom extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    final url = Uri(scheme: "ws", host: "54.193.15.138", port: 8080);
-    // final channel = IOWebSocketChannel.connect(url);
-    return /* StreamBuilder(
-      stream: channel.stream,
-      builder: ((context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-        final a = snapshot.data!.toString();
-        debugPrint(a);
-        // channel.sink.add("Hello");
-        return Text(a);
-      }),
-    ); */
-        const BuddycomButton();
+    return const BuddycomButton();
   }
 }
