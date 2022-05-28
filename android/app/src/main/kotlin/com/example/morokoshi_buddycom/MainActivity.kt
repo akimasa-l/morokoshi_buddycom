@@ -41,7 +41,7 @@ class MainActivity : FlutterActivity() {
             AudioRecord.getMinBufferSize(
                 samplingRate,
                 AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
+                AudioFormat.ENCODING_PCM_8BIT
             )
         )
     private lateinit var morokoshiAudioTrack: MorokoshiAudioTrack
@@ -58,7 +58,7 @@ class MainActivity : FlutterActivity() {
                 AudioFormat.Builder()
                     .setEncoding(AudioFormat.ENCODING_PCM_8BIT)
                     .setSampleRate(samplingRate)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_DEFAULT)
                     .build()
             )
             .setBufferSizeInBytes(audioBufferSizeInByte)
@@ -251,18 +251,28 @@ class MainActivity : FlutterActivity() {
             "com.morokoshi.audio.player"
         ).setMethodCallHandler { methodCall, result ->
             when (methodCall.method) {
-                "ready" ->
+                "ready" -> {
                     morokoshiAudioTrack = MorokoshiAudioTrack()
+                    result.success(null)
+                }
                 "play" -> {
                     val byte: ByteArray? = methodCall.argument("byte")
                     if (byte == null) {
                         result.error("", "argument byte is null or unset", null)
                     } else {
                         // morokoshiAudioTrack.ready(byte)
-                        morokoshiAudioTrack.play(byte)
+                        try {
+                            morokoshiAudioTrack.play(byte)
+                            result.success(null)
+                        } catch (e:Error) {
+                            result.error("",e.message,null)
+                        }
                     }
                 }
-                "stop" -> morokoshiAudioTrack.stop()
+                "stop" -> {
+                    morokoshiAudioTrack.stop()
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }

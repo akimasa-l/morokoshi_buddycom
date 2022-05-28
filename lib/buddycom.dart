@@ -17,6 +17,8 @@ class BuddycomButton extends StatefulWidget {
   State<BuddycomButton> createState() => _BuddycomButtonState();
 }
 
+/// だいたいここからのコピペ
+/// https://zenn.dev/pressedkonbu/books/flutter-reverse-lookup-dictionary/viewer/010-audi-streamer
 class WavePainter extends CustomPainter {
   WavePainter({
     required this.samples,
@@ -27,9 +29,7 @@ class WavePainter extends CustomPainter {
   Uint8List samples;
   static const color = Colors.blue;
 
-  final _absMax = 1;
   final uIntMax = pow(2, 8);
-  static const _hightOffset = 0.5;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -65,10 +65,13 @@ class WavePainter extends CustomPainter {
 }
 
 class _BuddycomButtonState extends State<BuddycomButton> {
-  static const EventChannel _channel =
-      EventChannel('com.morokoshi.audio.recorder');
+  static const EventChannel _recordChannel =
+      EventChannel("com.morokoshi.audio.recorder");
+  static const MethodChannel _playChannel =
+      MethodChannel("com.morokoshi.audio.player");
   late StreamSubscription _streamSubscription;
   Uint8List buffer = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7]);
+  List<Uint8List> playList = [];
   @override
   void initState() {
     super.initState();
@@ -88,12 +91,14 @@ class _BuddycomButtonState extends State<BuddycomButton> {
           child: const MorokoshiButton(),
           onLongPressStart: (details) {
             debugPrint("long press start");
-            _streamSubscription = _channel.receiveBroadcastStream().listen(
+            _streamSubscription =
+                _recordChannel.receiveBroadcastStream().listen(
               (event) {
                 // debugPrint("event: $event");
                 debugPrint(event.runtimeType.toString());
                 setState(() {
                   buffer = event as Uint8List;
+                  playList.add(buffer);
                 });
                 // debugPrint("event: $event");
               },
@@ -103,6 +108,15 @@ class _BuddycomButtonState extends State<BuddycomButton> {
             debugPrint("long press end");
             _streamSubscription.cancel();
           },
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            await _playChannel.invokeMethod("ready");
+            for (final play in playList) {
+              await _playChannel.invokeMethod("play", {"byte": play});
+            }
+          },
+          child: const Text("play"),
         ),
         /* LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -136,10 +150,10 @@ class _BuddycomButtonState extends State<BuddycomButton> {
           },
         ), */
         CustomPaint(
-          size:const Size(200, 200),
+          size: const Size(200, 200),
           painter: WavePainter(
             samples: buffer,
-            constraints:const BoxConstraints(maxWidth: 200, maxHeight: 200),
+            constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
           ),
         ),
       ],
