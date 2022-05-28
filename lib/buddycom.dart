@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/io.dart';
 import "dart:async";
+import "fastmdct.dart";
 
 class BuddycomButton extends StatefulWidget {
   const BuddycomButton({
@@ -25,8 +26,8 @@ class WavePainter extends CustomPainter {
     required this.constraints,
   });
 
-  BoxConstraints constraints;
-  Uint8List samples;
+  Size constraints;
+  Float32List samples;
   static const color = Colors.blue;
 
   final uIntMax = pow(2, 8);
@@ -52,12 +53,12 @@ class WavePainter extends CustomPainter {
   bool shouldRepaint(oldDelegate) => true;
 
   // 得られたデータを等間隔に並べていく
-  Iterable<Offset> toPoints(Uint8List samples) sync* {
+  Iterable<Offset> toPoints(Float32List samples) sync* {
     final length = samples.length;
-    final height = constraints.maxHeight;
-    final width = constraints.maxWidth;
+    final height = constraints.height;
+    final width = constraints.width;
     for (final sample in samples.asMap().entries) {
-      final y = sample.value / uIntMax * height;
+      final y = sample.value * height;
       final x = sample.key / length * width;
       yield Offset(x, y);
     }
@@ -70,8 +71,11 @@ class _BuddycomButtonState extends State<BuddycomButton> {
   static const MethodChannel _playChannel =
       MethodChannel("com.morokoshi.audio.player");
   late StreamSubscription _streamSubscription;
-  Uint8List buffer = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7]);
-  List<Uint8List> playList = [];
+  Float32List buffer = Float32List.fromList([.1, .2, .3, .4]);
+  Float32List compressed = Float32List.fromList([.0, .0, .0]);
+  Float32List expanded = Float32List.fromList([.0, .0, .0]);
+  List<Float32List> playList = [];
+  var ans = 0.0;
   @override
   void initState() {
     super.initState();
@@ -95,10 +99,17 @@ class _BuddycomButtonState extends State<BuddycomButton> {
                 _recordChannel.receiveBroadcastStream().listen(
               (event) {
                 // debugPrint("event: $event");
-                debugPrint(event.runtimeType.toString());
+                // debugPrint(event.runtimeType.toString());
                 setState(() {
-                  buffer = event as Uint8List;
-                  playList.add(buffer);
+                  buffer = event as Float32List;
+                  // playList.add(buffer);
+                  // debugPrint("buffer length : ${buffer.length}");
+                  compressed = Float32List.fromList(FastMDCT.mdct(
+                      buffer.length>>1, Vector.fromList([...buffer] /* コピーする */)).data);
+                  expanded = Float32List.fromList(
+                      FastMDCT.imdct(compressed.length, Vector.fromList([...compressed]))
+                          .data);
+                  playList.add(expanded);
                 });
                 // debugPrint("event: $event");
               },
@@ -150,10 +161,24 @@ class _BuddycomButtonState extends State<BuddycomButton> {
           },
         ), */
         CustomPaint(
-          size: const Size(200, 200),
+          size: const Size(100, 100),
           painter: WavePainter(
             samples: buffer,
-            constraints: const BoxConstraints(maxWidth: 200, maxHeight: 200),
+            constraints: const Size(100, 100),
+          ),
+        ),
+        CustomPaint(
+          size: const Size(100, 100),
+          painter: WavePainter(
+            samples: compressed /* .map((i)=>log(i.abs())).toList() */,
+            constraints: const Size(100, 100),
+          ),
+        ),
+        CustomPaint(
+          size: const Size(100, 100),
+          painter: WavePainter(
+            samples: expanded,
+            constraints: const Size(100, 100),
           ),
         ),
       ],
@@ -161,7 +186,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
   }
 }
 
-class WavePainter2Test extends StatefulWidget {
+/* class WavePainter2Test extends StatefulWidget {
   const WavePainter2Test({Key? key}) : super(key: key);
   @override
   State<WavePainter2Test> createState() => _WavePainter2TestState();
@@ -189,8 +214,8 @@ class _WavePainter2TestState extends State<WavePainter2Test> {
     );
   }
 }
-
-class WavePainter1Test extends StatefulWidget {
+ */
+/* class WavePainter1Test extends StatefulWidget {
   const WavePainter1Test({Key? key}) : super(key: key);
   @override
   State<WavePainter1Test> createState() => _WavePainter1TestState();
@@ -221,7 +246,7 @@ class _WavePainter1TestState extends State<WavePainter1Test> {
       ),
     );
   }
-}
+} */
 
 class WavePainter2 extends CustomPainter {
   WavePainter2({
@@ -231,7 +256,7 @@ class WavePainter2 extends CustomPainter {
   });
 
   BoxConstraints constraints;
-  List<double> samples;
+  Float32List samples;
   Color color;
 
   final _absMax = 1;
@@ -258,7 +283,7 @@ class WavePainter2 extends CustomPainter {
   bool shouldRepaint(oldPainting) => true;
 
   // 得られたデータを等間隔に並べていく
-  List<Offset> toPoints(List<double> samples) {
+  List<Offset> toPoints(Float32List samples) {
     final points = <Offset>[];
     for (var i = 0; i < (samples.length / 2); i++) {
       points.add(

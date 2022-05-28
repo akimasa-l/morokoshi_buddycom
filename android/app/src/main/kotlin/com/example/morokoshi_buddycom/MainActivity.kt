@@ -18,7 +18,7 @@ import io.flutter.plugins.GeneratedPluginRegistrant
 import kotlin.math.max
 
 class MainActivity : FlutterActivity() {
-    companion object{
+    companion object {
         private const val samplingRate = 44100
 
         // フレームレート (fps)
@@ -27,11 +27,13 @@ class MainActivity : FlutterActivity() {
         private const val frameRate = 10
 
         // 1フレームの音声データ(=Short値)の数
-        private const val oneFrameDataCount = samplingRate / frameRate
+        private const val oneFrameDataCount = 1024
 
         // 1フレームの音声データのバイト数 (byte)
         // Byte = 8 bit, Short = 16 bit なので, Shortの倍になる
-        private const val oneFrameSizeInByte = oneFrameDataCount * 2
+        private const val oneFrameSizeInByte = oneFrameDataCount
+
+        private const val encoding = AudioFormat.ENCODING_PCM_FLOAT
 
         // 音声データのバッファサイズ (byte)
         // 要件1:oneFrameSizeInByte より大きくする必要がある
@@ -42,10 +44,11 @@ class MainActivity : FlutterActivity() {
                 AudioRecord.getMinBufferSize(
                     samplingRate,
                     AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_8BIT
+                    encoding
                 )
             )
     }
+
     private lateinit var morokoshiAudioTrack: MorokoshiAudioTrack
 
     inner class MorokoshiAudioTrack {
@@ -58,7 +61,7 @@ class MainActivity : FlutterActivity() {
             )
             .setAudioFormat(
                 AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_8BIT)
+                    .setEncoding(encoding)
                     .setSampleRate(samplingRate)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_DEFAULT)
                     .build()
@@ -78,7 +81,7 @@ class MainActivity : FlutterActivity() {
         }
 
         //再生
-        fun play(arr: ByteArray) {
+        fun play(arr: FloatArray) {
             //再生バッファにデータを書き込む
             audioTrack.write(arr, 0, arr.count(), WRITE_BLOCKING)
 
@@ -191,7 +194,7 @@ class MainActivity : FlutterActivity() {
                             MediaRecorder.AudioSource.VOICE_COMMUNICATION, // 音声のソース
                             samplingRate, // サンプリングレート
                             AudioFormat.CHANNEL_IN_MONO, // チャネル設定. MONO and STEREO が全デバイスサポート保障
-                            AudioFormat.ENCODING_PCM_8BIT, // PCM16が全デバイスサポート保障
+                            encoding, // PCM16が全デバイスサポート保障
                             audioBufferSizeInByte // バッファ
                         )
                     } catch (e: Exception) {
@@ -209,28 +212,44 @@ class MainActivity : FlutterActivity() {
                         // notificationMarkerPosition = 40000 // 使わないなら設定しない.
 
                         // 音声データを格納する配列
-                        val audioDataArray = ByteArray(oneFrameDataCount)
+                        val audioDataArray = FloatArray(oneFrameDataCount)
                         setRecordPositionUpdateListener(object :
                             AudioRecord.OnRecordPositionUpdateListener {
 
                             // フレームごとの処理
                             override fun onPeriodicNotification(recorder: AudioRecord) {
-                                recorder.read(audioDataArray, 0, oneFrameDataCount) // 音声データ読込
-                                Log.v(
-                                    "AudioRecord",
-                                    "onPeriodicNotification size=${audioDataArray.size}"
-                                )
-                                eventSink.success(audioDataArray)
+                                if (recorder.state == AudioRecord.STATE_INITIALIZED) {
+                                    recorder.read(
+                                        audioDataArray,
+                                        0,
+                                        oneFrameDataCount,
+                                        AudioRecord.READ_BLOCKING
+                                    ) // 音声データ読込
+                                    Log.v(
+                                        "AudioRecord",
+                                        "onPeriodicNotification size=${audioDataArray.size}"
+                                    )
+                                    eventSink.success(audioDataArray)
+                                }
                                 // 好きに処理する
                             }
 
                             // マーカータイミングの処理.
                             // notificationMarkerPosition に到達した際に呼ばれる
                             override fun onMarkerReached(recorder: AudioRecord) {
-                                recorder.read(audioDataArray, 0, oneFrameDataCount) // 音声データ読込
-                                Log.v("AudioRecord", "onMarkerReached size=${audioDataArray.size}")
-                                // 好きに処理する
-                                eventSink.success(audioDataArray)
+                                if (recorder.state == AudioRecord.STATE_INITIALIZED) {
+                                    recorder.read(
+                                        audioDataArray,
+                                        0,
+                                        oneFrameDataCount,
+                                        AudioRecord.READ_BLOCKING
+                                    ) // 音声データ読込
+                                    Log.v(
+                                        "AudioRecord",
+                                        "onPeriodicNotification size=${audioDataArray.size}"
+                                    )
+                                    eventSink.success(audioDataArray)
+                                }
                             }
                         })
                         startRecording()
@@ -239,10 +258,11 @@ class MainActivity : FlutterActivity() {
                 }
 
                 override fun onCancel(arguments: Any?) {
-                    Log.w("Android", "EventChannel onCancel called")
+                    Log.d("Android", "EventChannel onCancel called")
                     audioRecord.apply {
                         stop()
                         release()
+
                     }
                 }
             }
@@ -258,7 +278,7 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "play" -> {
-                    val byte: ByteArray? = methodCall.argument("byte")
+                    val byte: FloatArray? = methodCall.argument("byte")
                     if (byte == null) {
                         result.error("", "argument byte is null or unset", null)
                     } else {
