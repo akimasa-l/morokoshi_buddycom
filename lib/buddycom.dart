@@ -119,7 +119,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
                 // debugPrint(event.runtimeType.toString());
                 setState(() {
                   buffer = event as Float32List;
-                  playList.add(buffer);
+                  // playList.add(buffer);
                   // debugPrint("buffer length : ${buffer.length}");
                   compressed = FastMDCT.mdct(
                       buffer.length >> 1,
@@ -129,7 +129,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
                       compressed.length,
                       Vector.fromList(
                           Float32List.fromList([...compressed]))).data;
-                  // playList.add(expanded);
+                  playList.add(expanded);
                   channel.sink.add(buffer.buffer.asUint8List());
                   isRecording = true;
                 });
