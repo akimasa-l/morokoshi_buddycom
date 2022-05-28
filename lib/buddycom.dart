@@ -1,5 +1,7 @@
+import 'dart:ffi';
+import 'dart:math';
 import 'dart:typed_data';
-
+import "dart:async";
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/io.dart';
@@ -23,9 +25,10 @@ class WavePainter extends CustomPainter {
 
   BoxConstraints constraints;
   Uint8List samples;
-  static const Color color = Colors.blue;
+  static const color = Colors.blue;
 
   final _absMax = 1;
+  final uIntMax = pow(2, 8);
   static const _hightOffset = 0.5;
 
   @override
@@ -38,7 +41,7 @@ class WavePainter extends CustomPainter {
 
     // 得られたデータをオフセットのリストに変換する
     // やっていることは決められた範囲で等間隔に点を並べているだけ
-    final points = toPoints(samples);
+    final points = toPoints(samples).toList();
 
     // addPolygon で path をつくり drawPath でグラフを表現する
     final path = Path()..addPolygon(points, false);
@@ -49,22 +52,15 @@ class WavePainter extends CustomPainter {
   bool shouldRepaint(oldDelegate) => true;
 
   // 得られたデータを等間隔に並べていく
-  List<Offset> toPoints(Uint8List samples) {
-    final points = <Offset>[];
-    for (var i = 0; i < (samples.length / 2); i++) {
-      points.add(
-        Offset(
-          i / (samples.length / 2) * constraints.maxWidth,
-          project(samples[i].toDouble(), _absMax, constraints.maxHeight),
-        ),
-      );
+  Iterable<Offset> toPoints(Uint8List samples) sync* {
+    final length = samples.length;
+    final height = constraints.maxHeight;
+    final width = constraints.maxWidth;
+    for (final sample in samples.asMap().entries) {
+      final y = sample.value / uIntMax * height;
+      final x = sample.key / length * width;
+      yield Offset(x, y);
     }
-    return points;
-  }
-
-  double project(double value, int max, double height) {
-    final waveHeight = (value / max) * height;
-    return waveHeight + _hightOffset * height;
   }
 }
 
@@ -72,7 +68,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
   static const EventChannel _channel =
       EventChannel('com.morokoshi.audio.recorder');
   late StreamSubscription _streamSubscription;
-  late Uint8List buffer;
+  Uint8List buffer = Uint8List.fromList([1, 2, 3, 4, 5, 6, 7]);
   @override
   void initState() {
     super.initState();
@@ -108,7 +104,7 @@ class _BuddycomButtonState extends State<BuddycomButton> {
             _streamSubscription.cancel();
           },
         ),
-        LayoutBuilder(
+        /* LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
             return CustomPaint(
               painter: WavePainter(
@@ -117,9 +113,153 @@ class _BuddycomButtonState extends State<BuddycomButton> {
               ),
             );
           },
+        ), */
+        /* CustomPaint(
+          painter: WavePainter(
+            samples: buffer,
+            constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
+          ),
+          willChange : true,
+          size:const Size(200,200)
+        ) */
+        // const WavePainter2Test(),
+        // const WavePainter1Test(),
+        /* LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return CustomPaint(
+              size: Size(200, constraints.maxWidth),
+              painter: WavePainter(
+                samples: buffer,
+                constraints: BoxConstraints(maxWidth:constraints.maxWidth,maxHeight:200),
+              ),
+            );
+          },
+        ), */
+        CustomPaint(
+          size:const Size(200, 200),
+          painter: WavePainter(
+            samples: buffer,
+            constraints:const BoxConstraints(maxWidth: 200, maxHeight: 200),
+          ),
         ),
       ],
     );
+  }
+}
+
+class WavePainter2Test extends StatefulWidget {
+  const WavePainter2Test({Key? key}) : super(key: key);
+  @override
+  State<WavePainter2Test> createState() => _WavePainter2TestState();
+}
+
+class _WavePainter2TestState extends State<WavePainter2Test> {
+  var buffer = [0.0, 0.0, 0.0, 0.0];
+  @override
+  void initState() {
+    super.initState();
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      buffer = List.generate(100, (index) => Random().nextDouble());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(200, 200),
+      painter: WavePainter2(
+        samples: buffer,
+        color: Colors.blue,
+        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
+      ),
+    );
+  }
+}
+
+class WavePainter1Test extends StatefulWidget {
+  const WavePainter1Test({Key? key}) : super(key: key);
+  @override
+  State<WavePainter1Test> createState() => _WavePainter1TestState();
+}
+
+class _WavePainter1TestState extends State<WavePainter1Test> {
+  var buffer = Uint8List.fromList([1, 2, 3, 4]);
+  @override
+  void initState() {
+    super.initState();
+    Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      setState(() {
+        buffer = Uint8List.fromList(
+          List.generate(100, (index) => Random().nextInt(256)),
+        );
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(200, 200),
+      painter: WavePainter(
+        samples: buffer,
+        // color: Colors.blue,
+        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 200),
+      ),
+    );
+  }
+}
+
+class WavePainter2 extends CustomPainter {
+  WavePainter2({
+    required this.samples,
+    required this.color,
+    required this.constraints,
+  });
+
+  BoxConstraints constraints;
+  List<double> samples;
+  Color color;
+
+  final _absMax = 1;
+  static const _hightOffset = 0.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 色、太さ、塗り潰しの有無などを指定
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    // 得られたデータをオフセットのリストに変換する
+    // やっていることは決められた範囲で等間隔に点を並べているだけ
+    final points = toPoints(samples);
+
+    // addPolygon で path をつくり drawPath でグラフを表現する
+    final path = Path()..addPolygon(points, false);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(oldPainting) => true;
+
+  // 得られたデータを等間隔に並べていく
+  List<Offset> toPoints(List<double> samples) {
+    final points = <Offset>[];
+    for (var i = 0; i < (samples.length / 2); i++) {
+      points.add(
+        Offset(
+          i / (samples.length / 2) * constraints.maxWidth,
+          project(samples[i], _absMax, constraints.maxHeight),
+        ),
+      );
+    }
+    return points;
+  }
+
+  double project(double value, int max, double height) {
+    final waveHeight = (value / max) * height;
+    return waveHeight + _hightOffset * height;
   }
 }
 
