@@ -1,4 +1,4 @@
-import 'dart:ffi';
+// import 'dart:ffi';
 import 'dart:math';
 import 'dart:typed_data';
 import "dart:async";
@@ -121,14 +121,14 @@ class _BuddycomButtonState extends State<BuddycomButton> {
                   buffer = event as Float32List;
                   // playList.add(buffer);
                   // debugPrint("buffer length : ${buffer.length}");
-                  compressed = FastMDCT.mdct(
-                      buffer.length >> 1,
-                      Vector.fromList(
-                          Float32List.fromList([...buffer]) /* コピーする */)).data;
-                  expanded = FastMDCT.imdct(
-                      compressed.length,
-                      Vector.fromList(
-                          Float32List.fromList([...compressed]))).data;
+                  // compressed = FastMDCT.mdct(
+                  //     buffer.length >> 1,
+                  //     Vector.fromList(
+                  //         Float32List.fromList([...buffer]) /* コピーする */)).data;
+                  // expanded = FastMDCT.imdct(
+                  //     compressed.length,
+                  //     Vector.fromList(
+                  //         Float32List.fromList([...compressed]))).data;
                   playList.add(expanded);
                   channel.sink.add(buffer.buffer.asUint8List());
                   isRecording = true;
