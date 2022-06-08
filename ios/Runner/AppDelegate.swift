@@ -18,6 +18,7 @@ func toPCMBuffer1(data: NSData) -> AVAudioPCMBuffer? {
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
     let morokoshiAudio = MorokoshiAudio()
+    let morokoshiAudioPlayer = MorokoshiAudioPlayer()
     override func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -41,7 +42,7 @@ func toPCMBuffer1(data: NSData) -> AVAudioPCMBuffer? {
                 let arguments = call.arguments as! [String: Any]
                 let byte = arguments["byte"] as! FlutterStandardTypedData
                 let data = NSData(data:byte.data)
-                morokoshiAudio.play(data: NSData(data:byte.data)){
+                morokoshiAudioPlayer.play(data: NSData(data:byte.data)){
                     [self] in
                     result(nil)
                 }
@@ -60,9 +61,10 @@ func toPCMBuffer1(data: NSData) -> AVAudioPCMBuffer? {
     }
     
 }
+let audioFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: 44100, channels: 1, interleaved: true)!
+
 class MorokoshiAudio:NSObject,FlutterStreamHandler{
     let engine = AVAudioEngine()
-    let audioFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: 44100, channels: 1, interleaved: true)!
     public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         // Switch for parsing commonFormat - Can abstract later
         let input = engine.inputNode
@@ -83,7 +85,7 @@ class MorokoshiAudio:NSObject,FlutterStreamHandler{
                     return nil
                 }
             }
-            let convertedBuffer = AVAudioPCMBuffer(pcmFormat: self.audioFormat, frameCapacity: AVAudioFrameCount(self.audioFormat.sampleRate) * buffer.frameLength / AVAudioFrameCount(buffer.format.sampleRate))!
+            let convertedBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: AVAudioFrameCount(audioFormat.sampleRate) * buffer.frameLength / AVAudioFrameCount(buffer.format.sampleRate))!
             memo = convertedBuffer
             var error: NSError?
             let status = converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputCallback)
@@ -106,10 +108,24 @@ class MorokoshiAudio:NSObject,FlutterStreamHandler{
         engine.stop()
         return nil
     }
-    
+}
+class MorokoshiAudioPlayer{
+    let engine = AVAudioEngine()
+    let audioPlayerNode = AVAudioPlayerNode()
+     init(){
+        //The node that will play the actual sound
+        engine.attach(audioPlayerNode) //Attachs the node to the engine
+        // return
+        engine.connect(audioPlayerNode, to: engine.outputNode, format: audioFormat) //Connects the applause playback node to the sound output
+        // return
+        engine.prepare()
+        
+        try?engine.start()
+        audioPlayerNode.play()
+    }
     func toPCMBuffer(data: NSData) -> AVAudioPCMBuffer? {
         // let audioFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 8000, channels: 1, interleaved: false)!  // given NSData audio format
-        guard let PCMBuffer = AVAudioPCMBuffer(pcmFormat: self.audioFormat, frameCapacity: UInt32(data.length) / self.audioFormat.streamDescription.pointee.mBytesPerFrame) else {
+        guard let PCMBuffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: UInt32(data.length) / audioFormat.streamDescription.pointee.mBytesPerFrame) else {
             return nil
         }
         PCMBuffer.frameLength = PCMBuffer.frameCapacity
@@ -120,22 +136,13 @@ class MorokoshiAudio:NSObject,FlutterStreamHandler{
     
     public func play(data:NSData, completionHandler:@escaping ()->Void){
         let buffer = toPCMBuffer(data:data)!
-        let engine = AVAudioEngine()
-        let audioPlayerNode = AVAudioPlayerNode() //The node that will play the actual sound
-        engine.attach(audioPlayerNode) //Attachs the node to the engine
-        // return
-        engine.connect(audioPlayerNode, to: engine.outputNode, format: audioFormat) //Connects the applause playback node to the sound output
-        // return
+        
         audioPlayerNode.scheduleBuffer(buffer, completionHandler:completionHandler)
-        
-        if(engine.isRunning){
-          print("engine is running")
-          completionHandler()
-          return
-        }
-        engine.prepare()
-        
-        try?engine.start()
-        audioPlayerNode.play()
+        print("debug")
+        // if(!engine.isRunning){
+        //   print("engine is running")
+        //   completionHandler()
+        //   return
+        // }
     }
 }
